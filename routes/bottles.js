@@ -5,7 +5,19 @@ const Bottle = require("../models/Bottle");
 // POST /api/bottles — Ajouter une bouteille
 router.post("/", async (req, res) => {
   try {
-    const newBottle = new Bottle(req.body);
+    const { nom, annee, quantite, type, couleur, pays, cave, emplacement } = req.body;
+
+    const newBottle = new Bottle({
+      nom,
+      annee,
+      quantite,
+      type,
+      couleur,
+      pays,
+      cave,
+      emplacement
+    });
+
     await newBottle.save();
     res.status(201).json({ message: "Bouteille ajoutée avec succès." });
   } catch (error) {
@@ -14,7 +26,7 @@ router.post("/", async (req, res) => {
   }
 });
 
-// GET /api/bottles — Liste des bouteilles (pour plus tard)
+// GET /api/bottles — Liste des bouteilles
 router.get("/", async (req, res) => {
   try {
     const bottles = await Bottle.find();
