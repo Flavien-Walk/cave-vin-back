@@ -37,4 +37,41 @@ router.get("/", async (req, res) => {
   }
 });
 
+// PUT /api/bottles/:id — Mettre à jour une bouteille
+router.put("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    const updatedBottle = await Bottle.findByIdAndUpdate(id, updateData, { new: true });
+
+    if (!updatedBottle) {
+      return res.status(404).json({ message: "Bouteille non trouvée." });
+    }
+
+    res.json({ message: "Bouteille mise à jour avec succès.", bottle: updatedBottle });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Erreur lors de la mise à jour de la bouteille." });
+  }
+});
+
+// DELETE /api/bottles/:id — Supprimer une bouteille
+router.delete("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const deletedBottle = await Bottle.findByIdAndDelete(id);
+
+    if (!deletedBottle) {
+      return res.status(404).json({ message: "Bouteille non trouvée." });
+    }
+
+    res.json({ message: "Bouteille supprimée avec succès." });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Erreur lors de la suppression de la bouteille." });
+  }
+});
+
 module.exports = router;
