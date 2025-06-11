@@ -10,7 +10,7 @@ const bottleSchema = new mongoose.Schema({
   cave: { type: String },
   emplacement: { type: String },
 }, {
-  timestamps: true // Pour avoir createdAt et updatedAt automatiquement
+  timestamps: true // Pour createdAt et updatedAt
 });
 
 module.exports = mongoose.model("Bottle", bottleSchema);

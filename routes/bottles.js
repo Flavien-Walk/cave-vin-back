@@ -19,7 +19,7 @@ router.post("/", async (req, res) => {
     });
 
     await newBottle.save();
-    res.status(201).json({ message: "Bouteille ajoutée avec succès." });
+    res.status(201).json({ message: "Bouteille ajoutée avec succès.", bottle: newBottle });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Erreur lors de l'ajout de la bouteille." });
