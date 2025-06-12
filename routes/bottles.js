@@ -1,5 +1,3 @@
-// routes/bottles.js
-
 const express = require("express");
 const router = express.Router();
 const Bottle = require("../models/Bottle");
@@ -47,7 +45,7 @@ router.post("/", async (req, res) => {
   }
 });
 
-// GET /api/bottles — Liste des bouteilles
+// GET /api/bottles — Liste des bouteilles (avec commentaires)
 router.get("/", async (req, res) => {
   try {
     const bottles = await Bottle.find();
@@ -92,6 +90,35 @@ router.delete("/:id", async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Erreur lors de la suppression de la bouteille." });
+  }
+});
+
+// POST /api/bottles/:id/comment — Ajouter un commentaire/note à une bouteille
+router.post("/:id/comment", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { texte, note, auteur } = req.body; // auteur optionnel
+
+    if (!texte || typeof note !== "number") {
+      return res.status(400).json({ message: "Le texte et la note sont obligatoires." });
+    }
+
+    const bottle = await Bottle.findById(id);
+    if (!bottle) {
+      return res.status(404).json({ message: "Bouteille non trouvée." });
+    }
+
+    bottle.commentaires.push({
+      texte,
+      note,
+      auteur
+    });
+
+    await bottle.save();
+    res.status(201).json({ message: "Commentaire ajouté.", commentaires: bottle.commentaires });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Erreur lors de l'ajout du commentaire." });
   }
 });
 
