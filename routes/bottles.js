@@ -45,7 +45,7 @@ router.post("/", async (req, res) => {
   }
 });
 
-// GET /api/bottles — Liste des bouteilles (avec commentaires)
+// GET /api/bottles — Liste des bouteilles (avec notePerso)
 router.get("/", async (req, res) => {
   try {
     const bottles = await Bottle.find();
@@ -93,11 +93,11 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
-// POST /api/bottles/:id/comment — Ajouter un commentaire/note à une bouteille
-router.post("/:id/comment", async (req, res) => {
+// PUT /api/bottles/:id/note — Ajouter ou modifier la note/avis d'une bouteille
+router.put("/:id/note", async (req, res) => {
   try {
     const { id } = req.params;
-    const { texte, note, auteur } = req.body; // auteur optionnel
+    const { texte, note } = req.body;
 
     if (!texte || typeof note !== "number") {
       return res.status(400).json({ message: "Le texte et la note sont obligatoires." });
@@ -108,17 +108,17 @@ router.post("/:id/comment", async (req, res) => {
       return res.status(404).json({ message: "Bouteille non trouvée." });
     }
 
-    bottle.commentaires.push({
+    bottle.notePerso = {
       texte,
       note,
-      auteur
-    });
+      date: new Date()
+    };
 
     await bottle.save();
-    res.status(201).json({ message: "Commentaire ajouté.", commentaires: bottle.commentaires });
+    res.status(200).json({ message: "Note/avis enregistré.", notePerso: bottle.notePerso });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ message: "Erreur lors de l'ajout du commentaire." });
+    res.status(500).json({ message: "Erreur lors de l'ajout/modification de la note." });
   }
 });
 
