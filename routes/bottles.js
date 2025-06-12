@@ -1,3 +1,5 @@
+// routes/bottles.js
+
 const express = require("express");
 const router = express.Router();
 const Bottle = require("../models/Bottle");
@@ -5,17 +7,36 @@ const Bottle = require("../models/Bottle");
 // POST /api/bottles — Ajouter une bouteille
 router.post("/", async (req, res) => {
   try {
-    const { nom, annee, quantite, type, couleur, pays, cave, emplacement } = req.body;
-
-    const newBottle = new Bottle({
+    const {
       nom,
+      producteur,
+      region,
+      appellation,
       annee,
       quantite,
       type,
       couleur,
       pays,
+      prixAchat,
+      consommerAvant,
       cave,
-      emplacement
+      emplacement,
+    } = req.body;
+
+    const newBottle = new Bottle({
+      nom,
+      producteur,
+      region,
+      appellation,
+      annee,
+      quantite,
+      type,
+      couleur,
+      pays,
+      prixAchat,
+      consommerAvant,
+      cave,
+      emplacement,
     });
 
     await newBottle.save();
