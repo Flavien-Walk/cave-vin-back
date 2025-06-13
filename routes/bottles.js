@@ -185,33 +185,129 @@ router.get("/recommend", async (req, res) => {
 });
 
 // POST /api/bottles/suggest-wine — Suggestion d'accord mets-vin pour un plat donné
+const removeAccents = (str) =>
+  str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
 router.post("/suggest-wine", async (req, res) => {
   try {
-    const { plat } = req.body;
+    let { plat } = req.body;
     if (!plat) return res.status(400).json({ message: "Plat requis." });
+    plat = removeAccents(plat);
 
-    const foodPairings = {
-      poisson: ["Blanc sec", "Sauvignon", "Chardonnay", "Blanc"],
-      viande_rouge: ["Rouge puissant", "Bordeaux", "Syrah", "Rouge"],
-      fromage: ["Rouge léger", "Blanc aromatique", "Pinot Noir", "Blanc", "Rouge"],
-      poulet: ["Chardonnay", "Viognier", "Rouge léger", "Beaujolais", "Blanc"],
-      barbecue: ["Syrah", "Grenache", "Zinfandel", "Rouge"],
-      dessert: ["Moelleux", "Sauternes", "Muscat", "Blanc"],
-    };
+    // Table ultra-détaillée, chaque catégorie a ses synonymes & plats
+    const foodPairings = [
+      // --- Poissons & fruits de mer
+      {
+        keywords: [
+          "poisson", "cabillaud", "saumon", "sole", "bar", "colin", "lotte",
+          "merlu", "espadon", "dorade", "turbot", "anchois", "maquereau", "sardine", "truite",
+          "fruits de mer", "fruit de mer", "huitre", "huitres", "crevette", "crevettes", "crabe",
+          "crustace", "crustaces", "homard", "langouste", "coquillage", "coquillages", "bulot",
+          "palourde", "palourdes", "praire", "praires", "coque", "coques", "oursin", "oursins", "tourteau", "moule", "moules", "calamar", "calamars", "seiche", "seiches", "encornet", "encornets", "poulpe", "poulpes", "pieuvre", "pieuvres"
+        ],
+        vins: ["Blanc sec", "Sauvignon", "Chablis", "Chardonnay", "Muscadet", "Picpoul", "Blanc", "Champagne"]
+      },
+      // --- Sushi & cuisine japonaise
+      {
+        keywords: [
+          "sushi", "sashimi", "makis", "maki", "yakitori", "japonais", "cuisine japonaise", "chirashi"
+        ],
+        vins: ["Blanc sec", "Champagne", "Riesling", "Blanc aromatique"]
+      },
+      // --- Viandes rouges & gibiers
+      {
+        keywords: [
+          "viande rouge", "boeuf", "bœuf", "steak", "entrecote", "entrecôte", "cote de boeuf", "côte de bœuf", "tournedos", "roti de boeuf", "magret", "agneau", "gibier", "cerf", "chevreuil", "sanglier", "canard", "bavette", "onglet", "rumsteck", "côtelette", "viande saignante", "gigue"
+        ],
+        vins: ["Rouge puissant", "Bordeaux", "Syrah", "Cabernet Sauvignon", "Côte-Rôtie", "Châteauneuf-du-Pape", "Rouge"]
+      },
+      // --- Viandes blanches & volailles
+      {
+        keywords: [
+          "viande blanche", "poulet", "dinde", "veau", "lapin", "coq", "pintade", "blanc de poulet", "escalope", "volaille", "poulet rôti", "poulet grille", "vol au vent", "blanquette", "suprême de volaille"
+        ],
+        vins: ["Chardonnay", "Viognier", "Rouge léger", "Beaujolais", "Blanc", "Pinot Noir"]
+      },
+      // --- Porc & charcuteries
+      {
+        keywords: [
+          "porc", "jambon", "charcuterie", "charcuteries", "saucisson", "paté", "pâté", "terrine", "rillettes", "boudin", "rosette", "coppa", "mortadelle", "andouille", "saucisse"
+        ],
+        vins: ["Beaujolais", "Gamay", "Rosé", "Rouge léger", "Côtes-du-Rhône", "Pinot Noir"]
+      },
+      // --- Pâtes, pizzas, lasagnes
+      {
+        keywords: [
+          "pates", "pâtes", "spaghetti", "penne", "tagliatelle", "lasagne", "lasagnes", "pizza", "pizzas", "cannelloni", "gnocchi", "ravioli", "tortellini"
+        ],
+        vins: ["Rouge italien", "Chianti", "Sangiovese", "Barbera", "Nero d'Avola", "Lambrusco", "Rosé", "Rouge", "Blanc"]
+      },
+      // --- Plats épicés, curry, cuisine indienne/asiatique
+      {
+        keywords: [
+          "curry", "curry vert", "curry rouge", "massaman", "thai", "thaï", "thai food", "cuisine indienne", "tandoori", "vindaloo", "samosa", "pakora", "nem", "nems", "wok", "asiatique", "pad thai", "pad thaï"
+        ],
+        vins: ["Blanc aromatique", "Riesling", "Gewurztraminer", "Rosé", "Vouvray", "Chenin", "Blanc doux"]
+      },
+      // --- Légumes, plats végétariens, quiche, gratin, risotto
+      {
+        keywords: [
+          "legume", "légume", "gratin", "tian", "flan", "risotto", "courgette", "aubergine", "tomate", "poivron", "ratatouille", "poireau", "fenouil", "asperge", "champignon", "salade", "taboulé", "taboule", "crudités", "crudite", "tarte salee", "tarte salée", "quiche", "omelette", "tofu", "seitan", "végétarien", "vegetarien", "vegane", "vegan", "falafel", "pomme de terre"
+        ],
+        vins: ["Rosé", "Blanc sec", "Chardonnay", "Pinot Gris", "Rouge léger", "Beaujolais", "Blanc"]
+      },
+      // --- Fromages (variétés les plus courantes)
+      {
+        keywords: [
+          "fromage", "camembert", "brie", "roquefort", "comte", "comté", "chevre", "chèvre", "bleu", "reblochon", "emmental", "tomme", "munster", "cantal", "raclette", "fondue"
+        ],
+        vins: ["Rouge léger", "Blanc aromatique", "Pinot Noir", "Blanc", "Rouge", "Gewurztraminer", "Sauternes", "Mondeuse"]
+      },
+      // --- Plats de fêtes, foie gras
+      {
+        keywords: [
+          "foie gras", "saumon fume", "saumon fumé", "homard", "noel", "noël", "fete", "fête"
+        ],
+        vins: ["Sauternes", "Champagne", "Monbazillac", "Blanc doux", "Gewurztraminer"]
+      },
+      // --- Plats du monde (tajine, couscous, paella...)
+      {
+        keywords: [
+          "tajine", "couscous", "paella", "cassoulet", "pot au feu", "choucroute", "saucisse lentilles", "bourguignon", "blanquette"
+        ],
+        vins: ["Rouge", "Côtes-du-Rhône", "Rosé", "Chardonnay", "Pinot Noir", "Syrah"]
+      },
+      // --- Entrées froides, terrines, oeufs, tapas
+      {
+        keywords: [
+          "entree", "entrée", "oeuf", "oeufs", "tapas", "gaspacho", "salade composee", "salade composée", "rillettes", "paté", "pâté", "terrine", "mousse"
+        ],
+        vins: ["Rosé", "Blanc sec", "Beaujolais", "Crémant", "Champagne"]
+      },
+      // --- Desserts (chocolat, fruits, tartes, glaces)
+      {
+        keywords: [
+          "dessert", "gateau", "gâteau", "tarte", "glace", "sorbet", "mousse au chocolat", "tiramisu", "crumble", "macaron", "brownie", "chocolat", "clafoutis", "panna cotta", "creme brulee", "crème brûlée", "fruit", "fruits", "fraise", "framboise", "poire", "pomme", "abricot", "ananas", "mangue", "coulis"
+        ],
+        vins: ["Moelleux", "Sauternes", "Muscat", "Blanc doux", "Monbazillac", "Champagne"]
+      },
+    ];
 
-    // Cherche le bon type d'accord
-    const platKey = Object.keys(foodPairings).find(key =>
-      plat.toLowerCase().includes(key)
+    // Trouver la catégorie correspondante
+    const foundPairing = foodPairings.find(pair =>
+      pair.keywords.some(key => plat.includes(removeAccents(key)))
     );
-    if (!platKey) return res.status(404).json({ message: "Plat non reconnu." });
 
-    const vinTypes = foodPairings[platKey];
+    if (!foundPairing) {
+      return res.status(404).json({ message: "Plat non reconnu. Essayez d'être plus précis ou testez un autre plat !" });
+    }
+
     const allBottles = await Bottle.find();
 
     const suggestions = allBottles.filter(b =>
-      vinTypes.includes(b.type) ||
-      vinTypes.includes(b.couleur) ||
-      vinTypes.includes(b.appellation)
+      foundPairing.vins.includes(b.type) ||
+      foundPairing.vins.includes(b.couleur) ||
+      foundPairing.vins.includes(b.appellation)
     );
 
     if (!suggestions.length) {
@@ -224,5 +320,6 @@ router.post("/suggest-wine", async (req, res) => {
     res.status(500).json({ message: "Erreur lors de la suggestion d'accord mets-vin." });
   }
 });
+
 
 module.exports = router;
