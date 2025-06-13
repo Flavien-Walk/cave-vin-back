@@ -12,6 +12,11 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
+// Route pour latest.json
+app.get("/latest.json", (req, res) => {
+  res.sendFile(__dirname + "/latest.json");
+});
+
 // Routes
 app.use("/api/bottles", bottleRoutes);
 
