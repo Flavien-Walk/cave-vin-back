@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const Bottle = require("../models/Bottle");
 
+// -------- ALGO UTILS --------
 function mostCommon(array) {
   if (!array.length) return null;
   const freq = {};
@@ -14,7 +15,9 @@ function mostCommon(array) {
   return result;
 }
 
-// POST /api/bottles — Ajouter une bouteille (toujours sur la cave unique)
+// -------- CRUD CLASSIQUE --------
+
+// POST /api/bottles — Ajouter une bouteille
 router.post("/", async (req, res) => {
   try {
     const {
@@ -29,6 +32,7 @@ router.post("/", async (req, res) => {
       pays,
       prixAchat,
       consommerAvant,
+      cave,
       emplacement,
     } = req.body;
 
@@ -44,7 +48,7 @@ router.post("/", async (req, res) => {
       pays,
       prixAchat,
       consommerAvant,
-      cave: "MaCavePerso",
+      cave,
       emplacement,
     });
 
@@ -56,10 +60,10 @@ router.post("/", async (req, res) => {
   }
 });
 
-// GET /api/bottles — Liste des bouteilles (avec notePerso)
+// GET /api/bottles — Liste des bouteilles (toutes, sans filtre)
 router.get("/", async (req, res) => {
   try {
-    const bottles = await Bottle.find({ cave: "MaCavePerso" });
+    const bottles = await Bottle.find();
     res.json(bottles);
   } catch (error) {
     console.error(error);
@@ -73,11 +77,7 @@ router.put("/:id", async (req, res) => {
     const { id } = req.params;
     const updateData = req.body;
 
-    const updatedBottle = await Bottle.findOneAndUpdate(
-      { _id: id, cave: "MaCavePerso" },
-      updateData,
-      { new: true }
-    );
+    const updatedBottle = await Bottle.findByIdAndUpdate(id, updateData, { new: true });
 
     if (!updatedBottle) {
       return res.status(404).json({ message: "Bouteille non trouvée." });
@@ -95,7 +95,7 @@ router.delete("/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
-    const deletedBottle = await Bottle.findOneAndDelete({ _id: id, cave: "MaCavePerso" });
+    const deletedBottle = await Bottle.findByIdAndDelete(id);
 
     if (!deletedBottle) {
       return res.status(404).json({ message: "Bouteille non trouvée." });
@@ -118,7 +118,7 @@ router.put("/:id/note", async (req, res) => {
       return res.status(400).json({ message: "Le texte et la note sont obligatoires." });
     }
 
-    const bottle = await Bottle.findOne({ _id: id, cave: "MaCavePerso" });
+    const bottle = await Bottle.findById(id);
     if (!bottle) {
       return res.status(404).json({ message: "Bouteille non trouvée." });
     }
@@ -137,37 +137,47 @@ router.put("/:id/note", async (req, res) => {
   }
 });
 
+// ----------- RECOMMANDATION (ALGO) -----------
+
 // GET /api/bottles/recommend — Recommande des bouteilles à découvrir
 router.get("/recommend", async (req, res) => {
   try {
-    // Bouteilles de la cave unique
-    const userBottles = await Bottle.find({ cave: "MaCavePerso" });
-    if (!userBottles.length) return res.status(404).json({ message: "Aucune bouteille dans la cave." });
+    // On prend toutes les bouteilles de la BDD
+    const allBottles = await Bottle.find();
 
-    const favorites = userBottles.filter(b => b.notePerso && b.notePerso.note >= 4);
+    // On sélectionne les bouteilles notées >=4
+    const favorites = allBottles.filter(b => b.notePerso && b.notePerso.note >= 4);
 
     if (!favorites.length) {
-      // Si aucun favori, recommander des best sellers, ou random (hors cave)
-      const others = await Bottle.find({ cave: { $ne: "MaCavePerso" } }).limit(5);
-      return res.json({ recommandations: others });
+      // Si aucun favori, on recommande des bouteilles non notées par l'utilisateur (exemple simple)
+      const notTasted = allBottles.filter(b => !b.notePerso);
+      return res.json({ recommandations: notTasted.slice(0, 5) });
     }
 
+    // Analyse des préférences de l'utilisateur
     const colorPref = mostCommon(favorites.map(b => b.couleur));
     const typePref = mostCommon(favorites.map(b => b.type));
     const regionPref = mostCommon(favorites.map(b => b.region));
 
-    const userBottleNames = userBottles.map(b => b.nom);
-    const suggestions = await Bottle.find({
-      cave: { $ne: "MaCavePerso" },
-      $or: [
-        { couleur: colorPref },
-        { type: typePref },
-        { region: regionPref },
-      ],
-      nom: { $nin: userBottleNames }
-    }).limit(5);
+    // On propose des bouteilles qu'il n'a pas encore notées,
+    // mais qui correspondent à ses goûts principaux
+    const alreadyTastedIds = favorites.map(b => String(b._id));
+    const suggestions = allBottles.filter(b =>
+      !alreadyTastedIds.includes(String(b._id)) &&
+      (
+        (colorPref && b.couleur === colorPref) ||
+        (typePref && b.type === typePref) ||
+        (regionPref && b.region === regionPref)
+      )
+    );
 
-    res.json({ recommandations: suggestions });
+    // Si aucune suggestion sur le profil de goûts, on renvoie au moins des non notées
+    if (suggestions.length === 0) {
+      const notTasted = allBottles.filter(b => !b.notePerso);
+      return res.json({ recommandations: notTasted.slice(0, 5) });
+    }
+
+    res.json({ recommandations: suggestions.slice(0, 5) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Erreur lors de la recommandation." });
@@ -181,23 +191,24 @@ router.post("/suggest-wine", async (req, res) => {
     if (!plat) return res.status(400).json({ message: "Plat requis." });
 
     const foodPairings = {
-      poisson: ["Blanc sec", "Sauvignon", "Chardonnay"],
-      viande_rouge: ["Rouge puissant", "Bordeaux", "Syrah"],
-      fromage: ["Rouge léger", "Blanc aromatique", "Pinot Noir"],
-      poulet: ["Chardonnay", "Viognier", "Rouge léger", "Beaujolais"],
-      barbecue: ["Syrah", "Grenache", "Zinfandel"],
-      dessert: ["Moelleux", "Sauternes", "Muscat"],
+      poisson: ["Blanc sec", "Sauvignon", "Chardonnay", "Blanc"],
+      viande_rouge: ["Rouge puissant", "Bordeaux", "Syrah", "Rouge"],
+      fromage: ["Rouge léger", "Blanc aromatique", "Pinot Noir", "Blanc", "Rouge"],
+      poulet: ["Chardonnay", "Viognier", "Rouge léger", "Beaujolais", "Blanc"],
+      barbecue: ["Syrah", "Grenache", "Zinfandel", "Rouge"],
+      dessert: ["Moelleux", "Sauternes", "Muscat", "Blanc"],
     };
 
+    // Cherche le bon type d'accord
     const platKey = Object.keys(foodPairings).find(key =>
       plat.toLowerCase().includes(key)
     );
     if (!platKey) return res.status(404).json({ message: "Plat non reconnu." });
 
     const vinTypes = foodPairings[platKey];
-    const userBottles = await Bottle.find({ cave: "MaCavePerso" });
+    const allBottles = await Bottle.find();
 
-    const suggestions = userBottles.filter(b =>
+    const suggestions = allBottles.filter(b =>
       vinTypes.includes(b.type) ||
       vinTypes.includes(b.couleur) ||
       vinTypes.includes(b.appellation)
@@ -207,7 +218,7 @@ router.post("/suggest-wine", async (req, res) => {
       return res.status(404).json({ message: "Aucun vin adapté trouvé dans votre cave." });
     }
 
-    res.json({ suggestions });
+    res.json({ suggestions: suggestions.slice(0, 5) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Erreur lors de la suggestion d'accord mets-vin." });
